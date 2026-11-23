@@ -125,7 +125,8 @@ def generate_summary_excel(dataframe, campus="Campus", month_str=""):
         
         left_cell_format = workbook.add_format({
             'font_name': 'Arial',
-            'font_size': 9,
+            'font_size': 14,
+            'bold': True,
             'align': 'left',
             'valign': 'vcenter',
             'border': 1,
@@ -134,7 +135,7 @@ def generate_summary_excel(dataframe, campus="Campus", month_str=""):
         
         leave_cell_center = workbook.add_format({
             'font_name': 'Arial',
-            'font_size': 9,
+            'font_size': 10,
             'align': 'center',
             'valign': 'vcenter',
             'bg_color': '#fff0f0',
@@ -146,7 +147,7 @@ def generate_summary_excel(dataframe, campus="Campus", month_str=""):
         
         leave_row_center = workbook.add_format({
             'font_name': 'Arial',
-            'font_size': 9,
+            'font_size': 10,
             'align': 'center',
             'valign': 'vcenter',
             'bg_color': '#fff0f0',
@@ -156,7 +157,8 @@ def generate_summary_excel(dataframe, campus="Campus", month_str=""):
         
         leave_row_left = workbook.add_format({
             'font_name': 'Arial',
-            'font_size': 9,
+            'font_size': 14,
+            'bold': True,
             'align': 'left',
             'valign': 'vcenter',
             'bg_color': '#fff0f0',
@@ -184,11 +186,11 @@ def generate_summary_excel(dataframe, campus="Campus", month_str=""):
         for col_idx, col_name in enumerate(headers):
             worksheet.write(3, col_idx, col_name, header_format)
             
-        # --- DATA ROWS ---
+        # --- DATA ROWS (Height ~22.5pt: exactly fits max 35 persons per A4 page) ---
         start_row = 4
         for row_idx, row in export_df.iterrows():
             current_excel_row = start_row + row_idx
-            worksheet.set_row(current_excel_row, 19)
+            worksheet.set_row(current_excel_row, 23)
             
             full_leaves = row['Full Leaves']
             is_leave_highlight = full_leaves > 0
@@ -229,18 +231,18 @@ def generate_summary_excel(dataframe, campus="Campus", month_str=""):
         
     return output.getvalue()
 
-# --- SUMMARY PDF GENERATOR (A4 Portrait, Exact Fit to Print & Repeating Headings) ---
+# --- SUMMARY PDF GENERATOR (A4 Portrait, Max 35 Persons/Page, 14pt Bold Name) ---
 def generate_summary_pdf(dataframe, campus, month_str=""):
     buffer = BytesIO()
     # A4 Portrait: width = 595.28 pt, height = 841.89 pt. 
-    # Left & Right margins = 18 pt each -> Total printable width = 595.28 - 36 = 559.28 pt
+    # Left & Right margins = 12 pt each -> Total printable width = 595.28 - 24 = 571.28 pt
     doc = SimpleDocTemplate(
         buffer, 
         pagesize=A4, 
-        leftMargin=18, 
-        rightMargin=18, 
-        topMargin=20, 
-        bottomMargin=20
+        leftMargin=12, 
+        rightMargin=12, 
+        topMargin=13, 
+        bottomMargin=13
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -249,7 +251,7 @@ def generate_summary_pdf(dataframe, campus, month_str=""):
         alignment=TA_CENTER, 
         fontName='Helvetica-Bold',
         fontSize=13, 
-        leading=16,
+        leading=15,
         textColor=colors.HexColor("#1155cc"),
         spaceAfter=2
     )
@@ -258,10 +260,10 @@ def generate_summary_pdf(dataframe, campus, month_str=""):
         parent=styles['Normal'], 
         alignment=TA_CENTER, 
         fontName='Helvetica-Bold',
-        fontSize=9.5, 
-        leading=12,
+        fontSize=9, 
+        leading=11,
         textColor=colors.HexColor("#333333"),
-        spaceAfter=10
+        spaceAfter=7
     )
     
     header_title = f"Laureate Group of Schools ({campus})"
@@ -276,12 +278,13 @@ def generate_summary_pdf(dataframe, campus, month_str=""):
     
     df_export = build_summary_export_df(dataframe)
     
-    # Exact Column widths summing to 558 pt (Exact fit for A4 Portrait 559 pt printable width)
-    # Sr. (24), Name (126), WD (26), LCs (26), Double LCs (44), Short Leaves (50), Missing Out Time (56), Full Leaves (46), Remit/Reason (140)
-    col_widths = [24, 126, 26, 26, 44, 50, 56, 46, 140]
+    # Exact Column widths summing to 563 pt (Fits within 571 pt printable width on A4 Portrait)
+    # Sr. (22), Name (180), WD (26), LCs (26), Double LCs (42), Short Leaves (48), Missing Out Time (54), Full Leaves (46), Remit/Reason (119)
+    col_widths = [22, 180, 26, 26, 42, 48, 54, 46, 119]
     
-    cell_style_left = ParagraphStyle('CellLeftP', fontName='Helvetica', fontSize=7.5, leading=9, alignment=TA_LEFT)
-    cell_style_center = ParagraphStyle('CellCenterP', fontName='Helvetica', fontSize=7.5, leading=9, alignment=TA_CENTER)
+    # Name column: Font Size 14 Bold (as requested)
+    cell_name_style = ParagraphStyle('NameBold14', fontName='Helvetica-Bold', fontSize=13.5, leading=14.5, alignment=TA_LEFT)
+    cell_center_style = ParagraphStyle('CellCenterP', fontName='Helvetica-Bold', fontSize=9.5, leading=11, alignment=TA_CENTER)
     header_style = ParagraphStyle('HdrStyleP', fontName='Helvetica-Bold', fontSize=7.5, leading=9, alignment=TA_CENTER, textColor=colors.whitesmoke)
     
     headers = ['Sr.', 'Name', 'WD', 'LCs', 'Double LCs', 'Short Leaves', 'Missing Out Time', 'Full Leaves', 'Remit/Reason']
@@ -289,27 +292,28 @@ def generate_summary_pdf(dataframe, campus, month_str=""):
     
     for row in df_export.itertuples(index=False):
         row_cells = [
-            Paragraph(str(row[0]), cell_style_center), # Sr.
-            Paragraph(str(row[1]), cell_style_left),   # Name
-            Paragraph(str(row[2]), cell_style_center), # WD
-            Paragraph(str(row[3]), cell_style_center), # LCs
-            Paragraph(str(row[4]), cell_style_center), # Double LCs
-            Paragraph(str(row[5]), cell_style_center), # Short Leaves
-            Paragraph(str(row[6]), cell_style_center), # Missing Out Time
-            Paragraph(str(row[7]), cell_style_center), # Full Leaves
-            Paragraph("", cell_style_left)             # Remit/Reason (Blank for manual entry by coordinator)
+            Paragraph(str(row[0]), cell_center_style), # Sr.
+            Paragraph(str(row[1]), cell_name_style),   # Name (14pt Bold)
+            Paragraph(str(row[2]), cell_center_style), # WD
+            Paragraph(str(row[3]), cell_center_style), # LCs
+            Paragraph(str(row[4]), cell_center_style), # Double LCs
+            Paragraph(str(row[5]), cell_center_style), # Short Leaves
+            Paragraph(str(row[6]), cell_center_style), # Missing Out Time
+            Paragraph(str(row[7]), cell_center_style), # Full Leaves
+            Paragraph("", cell_center_style)           # Remit/Reason (Blank for manual coordinator entry)
         ]
         table_data.append(row_cells)
         
+    # Row padding calibrated so maximum 35 persons fit perfectly on 1 page!
     t_style = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1155cc")),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#aaaaaa")),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 2.5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 2.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.2),
+        ('LEFTPADDING', (0, 0), (-1, -1), 2),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 2),
     ]
     
     # Alternating row background for clean readability & highlight leaves
