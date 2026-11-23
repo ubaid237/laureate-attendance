@@ -73,11 +73,160 @@ def generate_excel(dataframe):
         dataframe.to_excel(writer, index=False, sheet_name='Report Data')
     return output.getvalue()
 
-def generate_summary_excel(dataframe):
+def generate_summary_excel(dataframe, campus="Campus", month_str=""):
     export_df = build_summary_export_df(dataframe)
     output = BytesIO()
+    
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        export_df.to_excel(writer, index=False, sheet_name='Summary')
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('Summary')
+        writer.sheets['Summary'] = worksheet
+        
+        # --- STYLES / FORMATS MATCHING SAMPLE & PDF ---
+        title_format = workbook.add_format({
+            'bold': True,
+            'font_name': 'Arial',
+            'font_size': 14,
+            'font_color': '#1155cc',
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        subtitle_format = workbook.add_format({
+            'bold': True,
+            'font_name': 'Arial',
+            'font_size': 10,
+            'font_color': '#333333',
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        header_format = workbook.add_format({
+            'bold': True,
+            'font_name': 'Arial',
+            'font_size': 9.5,
+            'font_color': '#FFFFFF',
+            'bg_color': '#1155cc',
+            'align': 'center',
+            'valign': 'vcenter',
+            'text_wrap': True,
+            'border': 1,
+            'border_color': '#555555'
+        })
+        
+        center_cell_format = workbook.add_format({
+            'font_name': 'Arial',
+            'font_size': 9,
+            'align': 'center',
+            'valign': 'vcenter',
+            'border': 1,
+            'border_color': '#CCCCCC'
+        })
+        
+        left_cell_format = workbook.add_format({
+            'font_name': 'Arial',
+            'font_size': 9,
+            'align': 'left',
+            'valign': 'vcenter',
+            'border': 1,
+            'border_color': '#CCCCCC'
+        })
+        
+        leave_cell_center = workbook.add_format({
+            'font_name': 'Arial',
+            'font_size': 9,
+            'align': 'center',
+            'valign': 'vcenter',
+            'bg_color': '#fff0f0',
+            'font_color': '#990000',
+            'bold': True,
+            'border': 1,
+            'border_color': '#CCCCCC'
+        })
+        
+        leave_row_center = workbook.add_format({
+            'font_name': 'Arial',
+            'font_size': 9,
+            'align': 'center',
+            'valign': 'vcenter',
+            'bg_color': '#fff0f0',
+            'border': 1,
+            'border_color': '#CCCCCC'
+        })
+        
+        leave_row_left = workbook.add_format({
+            'font_name': 'Arial',
+            'font_size': 9,
+            'align': 'left',
+            'valign': 'vcenter',
+            'bg_color': '#fff0f0',
+            'border': 1,
+            'border_color': '#CCCCCC'
+        })
+
+        # --- TITLES (Rows 1 & 2) ---
+        worksheet.set_row(0, 24)
+        worksheet.set_row(1, 18)
+        worksheet.set_row(2, 6)  # spacer row
+        
+        header_title = f"Laureate Group of Schools ({campus})"
+        sub_title = "Monthly Staff Attendance & Payroll Summary Report"
+        if month_str:
+            sub_title += f" — {month_str}"
+            
+        worksheet.merge_range('A1:I1', header_title, title_format)
+        worksheet.merge_range('A2:I2', sub_title, subtitle_format)
+        
+        # --- TABLE HEADERS (Row 4) ---
+        headers = ['Sr.', 'Name', 'WD', 'LCs', 'Double LCs', 'Short Leaves', 'Missing Out Time', 'Full Leaves', 'Remit/Reason']
+        worksheet.set_row(3, 24)
+        
+        for col_idx, col_name in enumerate(headers):
+            worksheet.write(3, col_idx, col_name, header_format)
+            
+        # --- DATA ROWS ---
+        start_row = 4
+        for row_idx, row in export_df.iterrows():
+            current_excel_row = start_row + row_idx
+            worksheet.set_row(current_excel_row, 19)
+            
+            full_leaves = row['Full Leaves']
+            is_leave_highlight = full_leaves > 0
+            
+            c_sr = leave_row_center if is_leave_highlight else center_cell_format
+            c_name = leave_row_left if is_leave_highlight else left_cell_format
+            c_num = leave_row_center if is_leave_highlight else center_cell_format
+            c_fl = leave_cell_center if is_leave_highlight else center_cell_format
+            c_remit = leave_row_left if is_leave_highlight else left_cell_format
+            
+            worksheet.write(current_excel_row, 0, int(row['Sr.']), c_sr)
+            worksheet.write(current_excel_row, 1, str(row['Name']), c_name)
+            worksheet.write(current_excel_row, 2, int(row['WD']), c_num)
+            worksheet.write(current_excel_row, 3, int(row['LCs']), c_num)
+            worksheet.write(current_excel_row, 4, int(row['Double LCs']), c_num)
+            worksheet.write(current_excel_row, 5, int(row['Short Leaves']), c_num)
+            worksheet.write(current_excel_row, 6, int(row['Missing Out Time']), c_num)
+            worksheet.write(current_excel_row, 7, int(row['Full Leaves']), c_fl)
+            worksheet.write(current_excel_row, 8, "", c_remit)
+            
+        # --- COLUMN WIDTHS (Exact print fit & clean readability) ---
+        worksheet.set_column(0, 0, 6)    # Sr.
+        worksheet.set_column(1, 1, 24)   # Name
+        worksheet.set_column(2, 2, 8)    # WD
+        worksheet.set_column(3, 3, 8)    # LCs
+        worksheet.set_column(4, 4, 13)   # Double LCs
+        worksheet.set_column(5, 5, 14)   # Short Leaves
+        worksheet.set_column(6, 6, 17)   # Missing Out Time
+        worksheet.set_column(7, 7, 13)   # Full Leaves
+        worksheet.set_column(8, 8, 30)   # Remit/Reason (Wide for coordinator manual notes)
+        
+        # --- PAGE SETUP (A4 Portrait, Fit to 1 page wide for printing) ---
+        worksheet.set_paper(9) # 9 = A4 paper
+        worksheet.set_portrait()
+        worksheet.set_margins(left=0.3, right=0.3, top=0.4, bottom=0.4)
+        worksheet.fit_to_pages(1, 0) # 1 page wide, automatic pages tall
+        worksheet.repeat_rows(3, 3)  # Repeat header row on every printed page!
+        
     return output.getvalue()
 
 # --- SUMMARY PDF GENERATOR (A4 Portrait, Exact Fit to Print & Repeating Headings) ---
@@ -757,8 +906,9 @@ if st.session_state.batch_results:
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for c_name, data in batch_dict.items():
                 safe_name = re.sub(r'[^\w\s-]', '', c_name).strip().replace(' ', '_')
-                # 1. Summary Excel (Sample Format)
-                excel_bytes = generate_summary_excel(data['summary_df'])
+                # 1. Summary Excel (Formatted A4 Portrait)
+                m_txt = f"{data['min_date'].strftime('%B %Y')}" if 'min_date' in data else ""
+                excel_bytes = generate_summary_excel(data['summary_df'], c_name, m_txt)
                 zip_file.writestr(f"{safe_name}/{safe_name}_Summary.xlsx", excel_bytes)
                 # 2. Master Excel
                 sorted_excel_bytes = generate_excel(data['sorted_report_df'])
@@ -817,7 +967,8 @@ if st.session_state.batch_results:
             
             c1, c2 = st.columns(2)
             with c1:
-                excel_data = generate_summary_excel(summary_df)
+                m_label = f"{camp_data['min_date'].strftime('%B %Y')}" if 'min_date' in camp_data else ""
+                excel_data = generate_summary_excel(summary_df, selected_campus, m_label)
                 st.download_button(
                     f"📥 Download Summary (Excel) - {selected_campus}", 
                     data=excel_data, 
