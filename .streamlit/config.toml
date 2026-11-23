@@ -1,0 +1,11 @@
+[server]
+enableXsrfProtection = false
+maxUploadSize = 500
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#1155cc"
